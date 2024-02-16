@@ -5,36 +5,64 @@
 # Nuget Package
 
 ```csharp
-<PackageReference Include="HotChocolate.AspNetCore" Version="13.8.0" />
-<PackageReference Include="HotChocolate.Data.EntityFramework" Version="13.8.0" />
-<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="7.0.0" />
+HotChocolate.AspNetCore
+HotChocolate.AspNetCore.Authorization
+Microsoft.AspNetCore.Authentication.JwtBearer
+HotChocolate.Data.EntityFramework
+Microsoft.EntityFrameworkCore.InMemory
 ```
 
 # Program.cs
 
 ```csharp
-var builder = WebApplication.CreateBuilder(args);
 
-        builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("ApiDb"));
+builder.Services.AddScoped<TokenHelper>();
 
-        builder.Services.AddGraphQLServer()
-                        .AddProjections()
-                        .AddFiltering()
-                        .AddSorting()
-                        .AddQueryType<Query>()
-                        .AddMutationType<Mutation>()
-                        .AddSubscriptionType<Subscription>();
+builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("ApiDb"));
 
 
-        var app = builder.Build();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidIssuer = "http://localhost:5054",
+                        ValidAudience = "http://localhost:5054",
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("c082a53a-938b-4504-8cff-def4667e8854"))
+                    };
+                });
 
-        app.SeedData();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("HasRole", policy =>
+    policy.RequireAssertion(context =>
+        context.User.HasClaim(c => c.Type == ClaimTypes.Role)));
+});
 
-        app.UseWebSockets();
+builder.Services.AddGraphQLServer()
+                .AddAuthorization()
+                .AddProjections()
+                .AddFiltering()
+                .AddSorting()
+                .AddQueryType<Query>()
+                .AddMutationType<Mutation>()
+                .AddSubscriptionType<Subscription>();
 
-        app.MapGraphQL();
 
-        app.Run();
+var app = builder.Build();
+
+app.SeedData();
+
+app.UseAuthentication();
+
+app.UseAuthorization();
+
+app.UseWebSockets();
+
+app.MapGraphQL();
+
+app.Run();
 ```
 
 # Models
@@ -62,6 +90,48 @@ public class Member
 }
 ```
 
+```csharp
+public class User
+{
+    public string Id { get; set; }
+    public string Email { get; set; }
+    public string Password { get; set; }
+    public string Username { get; set; }   
+
+    public string? RoleId { get; set; }
+    public Role? Role { get; set; }
+
+}
+```
+
+```csharp
+public class Role
+{
+    public string Id { get; set; }
+    public string Name { get; set; }
+
+    public ICollection<User> Users { get; set; }  = new HashSet<User>();
+}
+```
+
+# Context
+
+```csharp
+public class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions<AppDbContext>options) : base(options)
+    {
+        
+    }
+
+    public DbSet<Project>Projects { get; set; }
+    public DbSet<Member> Members { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<Role>Roles { get; set; }
+
+}
+```
+
 # Seeding Data by Bogus
 
 ```csharp
@@ -73,6 +143,7 @@ public static class DataSeeding
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
 
+        // Seeding project
         string projectId = Guid.NewGuid().ToString();
         var fakerProject = new Faker<Project>()
         .RuleFor(x => x.Name, f => f.Company.Bs())
@@ -82,7 +153,7 @@ public static class DataSeeding
         db.Projects.Add(project);
 
 
-
+        // Seeding member
         var fakerMember = new Faker<Member>()
             .RuleFor(x => x.ProjectId, f => projectId)
             .RuleFor(x => x.Name, f => f.Name.FirstName())
@@ -90,13 +161,51 @@ public static class DataSeeding
             .RuleFor(x => x.Title, f => f.Name.JobTitle())
             .RuleFor(x => x.Id, f => Guid.NewGuid().ToString());
 
+
         List<Member> members = fakerMember.Generate(20);
         db.Members.AddRange(members);
 
-        db.SaveChanges();
 
+        // Seeding role
+        string adminId = Guid.NewGuid().ToString();
+        var fakeRoleAdmin = new Faker<Role>()
+            .RuleFor(x => x.Name, f => "ADMIN")
+            .RuleFor(x => x.Id, f => adminId);
+
+        string managerId = Guid.NewGuid().ToString();
+        var fakeRoleManager = new Faker<Role>()
+            .RuleFor(x => x.Name, f => "MANAGER")
+            .RuleFor(x => x.Id, f => managerId);
+
+
+        var admin = fakeRoleAdmin.Generate();
+        var manager = fakeRoleManager.Generate();
+        db.Roles.AddRange(admin, manager);
+
+        // Seeding User
+        var fakeManager = new Faker<User>()
+         .RuleFor(x => x.Id, f => Guid.NewGuid().ToString())
+          .RuleFor(x => x.Email, f => f.Person.Email)
+          .RuleFor(x => x.Password, f => "123456")
+          .RuleFor(x => x.Username, f => f.Person.UserName)
+          .RuleFor(x => x.RoleId, f => managerId);
+
+        var user = fakeManager.Generate(1);
+        db.Users.AddRange(user);
+
+        var fakeUser = new Faker<User>()
+            .RuleFor(x => x.Id, f => Guid.NewGuid().ToString())
+            .RuleFor(x => x.Email, f => f.Person.Email)
+            .RuleFor(x => x.Password, f => "123456")
+            .RuleFor(x => x.Username, f => f.Person.UserName)
+            .RuleFor(x => x.RoleId, f => adminId);
+
+        List<User> users = fakeUser.Generate(5);
+
+        db.Users.AddRange(users);
+
+        db.SaveChanges();
     }
-}
 ```
 
 # Schemas
@@ -122,10 +231,42 @@ public class Query
     {
         return await Task.FromResult(context.Members);
     }
+
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public async Task<IQueryable<User>> GetUserAsync([Service] AppDbContext context)
+    {
+        return await Task.FromResult(context.Users);
+    }
+
+
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    [Authorize("HasRole", Roles = ["MANAGER"])]
+    public async Task<IQueryable<Role>> GetRoleAsync([Service] AppDbContext context)
+    {
+        return await Task.FromResult(context.Roles);
+    }
+
+
+    public async Task<LoginResponse> LoginAsync(LoginInput input, [Service] AppDbContext context, [Service] TokenHelper tokenHelper)
+    {
+        var user = await context.Users.Include(x=>x.Role).SingleOrDefaultAsync(x => x.Username == input.Username && x.Password == input.Password);
+
+        if (user is null)
+        {
+            throw new GraphQLException("Username or password is wrong!");
+        }
+
+        var token = tokenHelper.GenerateToken(user);
+
+        return new LoginResponse(token.Token, token.TokenExpire, user);
+    }
 }
 
 ```
-
 ## Mutation.cs
 ```csharp
 public class Mutation
@@ -200,8 +341,13 @@ public class Subscription
 }
 ```
 
-# Requests and Responses
+# Requests and responses
 Attention! All the requests must to call by the Http POST method for usage the GraphQL
+
+## User-Role requests and responses
+![Screenshot_1](https://github.com/oznakdn/Practical-GraphQL/assets/79724084/ea15623a-e034-4b45-af6e-1865f61be24f)
+![Screenshot_2](https://github.com/oznakdn/Practical-GraphQL/assets/79724084/9c83f8b5-9f05-4db3-96d0-224522471474)
+
 
 ## Project requests and responses
 ![Screenshot_1](https://github.com/oznakdn/Practical-GraphQL/assets/79724084/704f5b33-22f1-4515-bf6e-1f5e5bca2328)
