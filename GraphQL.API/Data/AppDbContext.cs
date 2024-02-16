@@ -12,5 +12,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Project>Projects { get; set; }
     public DbSet<Member> Members { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<Role>Roles { get; set; }
 
 }

@@ -9,7 +9,9 @@
   <ItemGroup>
     <PackageReference Include="Bogus" Version="35.4.0" />
     <PackageReference Include="HotChocolate.AspNetCore" Version="13.8.0" />
+    <PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="13.8.0" />
 	  <PackageReference Include="HotChocolate.Data.EntityFramework" Version="13.8.0" />
+	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.0" />
   </ItemGroup>
 
