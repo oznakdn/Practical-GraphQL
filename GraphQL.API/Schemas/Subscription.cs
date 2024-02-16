@@ -6,7 +6,7 @@ public class Subscription
 {
     [Subscribe]
     [Topic]
-    public Project OnPlatformAdded([EventMessage] Project project)
+    public Project OnProjectCreated([EventMessage] Project project)
     {
         return project;
     }

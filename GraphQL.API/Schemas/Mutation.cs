@@ -56,7 +56,7 @@ public class Mutation
         context.Add(project);
         await context.SaveChangesAsync(cancellationToken);
 
-        await eventSender.SendAsync(nameof(Subscription.OnPlatformAdded), project, cancellationToken);
+        await eventSender.SendAsync(nameof(Subscription.OnProjectCreated), project, cancellationToken);
 
         return new CreateProjectOutput(project);
 
