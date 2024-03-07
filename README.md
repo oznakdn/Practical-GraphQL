@@ -1,6 +1,9 @@
 
 <img src="https://api.nuget.org/v3-flatcontainer/hotchocolate/13.8.1/icon" height=200 width=200>
-<a href="https://chillicream.com/docs/hotchocolate/v13">Hot Chocolate documentation</a>
+<a href="https://chillicream.com/docs/hotchocolate/v13">Hot Chocolate documentation</a> </br>
+<a href="https://github.com/ChilliCream/hotchocolate-examples/tree/master/misc">Examples documentation</a></br>
+<a href="https://github.com/ChilliCream/hotchocolate-examples/tree/master/misc%2FCodeFirst">Example documentation</a>
+
 
 # Nuget Package
 
